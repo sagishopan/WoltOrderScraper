@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Wolt Scraper</string>
+    <string name="accessibility_service_label">Wolt Order Scraper</string>
+    <string name="accessibility_service_description">Monitors Wolt Merchant Lite for new orders and saves customer details to Google Sheets automatically.</string>
+</resources>
