@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F5F5">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Wolt Order Scraper"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="#1A1A2E"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/tv_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Checking status..."
+            android:textSize="14sp"
+            android:textColor="#666666"
+            android:layout_marginBottom="24dp" />
+
+        <ImageView
+            android:id="@+id/iv_status_icon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btn_enable_accessibility"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Enable Accessibility Service"
+            android:backgroundTint="#009DE0"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Spreadsheet ID"
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/et_spreadsheet_id"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Paste Spreadsheet ID here"
+            android:inputType="text"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Service Account Email"
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/et_service_account_email"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="service@project.iam.gserviceaccount.com"
+            android:inputType="textEmailAddress"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Private Key"
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/et_private_key"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:hint="-----BEGIN PRIVATE KEY-----"
+            android:inputType="textMultiLine"
+            android:gravity="top"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp" />
+
+        <Button
+            android:id="@+id/btn_save"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Save Settings"
+            android:backgroundTint="#009DE0"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btn_test_connection"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Test Connection"
+            android:backgroundTint="#4CAF50"
+            android:textColor="#FFFFFF" />
+
+    </LinearLayout>
+</ScrollView>
