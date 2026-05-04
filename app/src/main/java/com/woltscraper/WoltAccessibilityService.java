@@ -9,20 +9,25 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import java.util.List;
 
 /**
- * WoltAccessibilityService - Calibrated from real Wolt Merchant Lite screenshots
+ * WoltAccessibilityService - Calibrated from real screenshots
  *
- * FLOW based on actual UI:
- *   1. New order appears on "New orders" tab with Accept button
- *   2. Tap order card → bottom sheet: "Order #001" + [Kevin C.] [Call button]
- *   3. Read order # and customer name
- *   4. Tap "Call" button → "Call customer" sheet with phone +17147142820
- *   5. Read phone → close sheet → send to Google Sheets
+ * Flow (based on actual Wolt Merchant Lite UI):
+ * - Orders appear in "In progress" tab (workers accept manually)
+ * - Each order card shows: #001  Kevin C.
+ * - Tap card -> bottom sheet: "Order #001" + [Kevin C.] [Call button]
+ * - Tap Call -> "Call customer" sheet with phone number
+ * - Read phone -> send to Google Sheets
  */
 public class WoltAccessibilityService extends AccessibilityService {
 
     private static final String TAG = "WoltScraper";
 
-    private enum State { IDLE, WAITING_FOR_ORDER_SHEET, WAITING_FOR_CALL_SHEET, DONE }
+    private enum State {
+        IDLE,
+        WAITING_FOR_ORDER_SHEET,
+        WAITING_FOR_CALL_SHEET,
+        DONE
+    }
 
     private State currentState = State.IDLE;
     private String currentOrderNumber = "";
@@ -36,56 +41,72 @@ public class WoltAccessibilityService extends AccessibilityService {
         if (event == null) return;
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return;
+
         switch (currentState) {
-            case IDLE: checkForNewOrder(root); break;
-            case WAITING_FOR_ORDER_SHEET: tryReadOrderSheet(root); break;
-            case WAITING_FOR_CALL_SHEET: tryReadCallSheet(root); break;
+            case IDLE:
+                checkForNewOrder(root);
+                break;
+            case WAITING_FOR_ORDER_SHEET:
+                tryReadOrderSheet(root);
+                break;
+            case WAITING_FOR_CALL_SHEET:
+                tryReadCallSheet(root);
+                break;
         }
         root.recycle();
     }
 
-    // Step 1: Detect new order (has Accept button on New orders tab)
+    /**
+     * Step 1: Detect new order in "In progress" tab
+     * Orders appear as cards with format: #001  Kevin C.
+     * We look for order number pattern #XXX that we haven't processed yet
+     */
     private void checkForNewOrder(AccessibilityNodeInfo root) {
-        List<AccessibilityNodeInfo> acceptBtns = root.findAccessibilityNodeInfosByText("Accept");
-        if (acceptBtns == null || acceptBtns.isEmpty()) return;
         String orderNum = findOrderNumber(root);
         if (orderNum == null || orderNum.equals(lastProcessedOrder)) return;
-        Log.d(TAG, "New order: " + orderNum);
+
+        Log.d(TAG, "New order detected: " + orderNum);
         currentOrderNumber = orderNum;
         currentState = State.WAITING_FOR_ORDER_SHEET;
-        handler.postDelayed(() -> tapOrderCard(orderNum), 600);
+        handler.postDelayed(() -> tapOrderCard(orderNum), 800);
     }
 
-    // Step 2: Tap order card to open bottom sheet
+    /**
+     * Step 2: Tap the order card to open bottom sheet
+     */
     private void tapOrderCard(String orderNum) {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return;
         AccessibilityNodeInfo card = findClickableContaining(root, orderNum);
         if (card != null) {
             card.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-            Log.d(TAG, "Tapped order card: " + orderNum);
+            Log.d(TAG, "Tapped order: " + orderNum);
         }
         root.recycle();
     }
 
-    // Step 3: Read order sheet — title "Order #001", customer row with Call button
+    /**
+     * Step 3: Read order sheet
+     * Bottom sheet shows: "Order #001" title + [Kevin C.] [Call] button
+     */
     private void tryReadOrderSheet(AccessibilityNodeInfo root) {
-        // Get order number from title "Order #001"
         String titleText = findTextStartingWith(root, "Order #");
         if (titleText != null) {
             currentOrderNumber = titleText.replace("Order ", "").trim();
         }
-        // Get customer name from row next to Call button
+
         String name = findCustomerNameNearCallButton(root);
         if (name != null && !name.isEmpty()) {
             currentCustomerName = name;
             Log.d(TAG, "Customer: " + name);
             currentState = State.WAITING_FOR_CALL_SHEET;
-            handler.postDelayed(this::tapCallButton, 500);
+            handler.postDelayed(this::tapCallButton, 600);
         }
     }
 
-    // Step 4: Tap the "Call" button (next to customer name in order sheet)
+    /**
+     * Step 4: Tap "Call" button
+     */
     private void tapCallButton() {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return;
@@ -94,22 +115,33 @@ public class WoltAccessibilityService extends AccessibilityService {
             for (AccessibilityNodeInfo node : callNodes) {
                 if (node.isClickable()) {
                     node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                    root.recycle(); return;
+                    root.recycle();
+                    return;
                 }
                 AccessibilityNodeInfo p = node.getParent();
                 while (p != null) {
-                    if (p.isClickable()) { p.performAction(AccessibilityNodeInfo.ACTION_CLICK); root.recycle(); return; }
-                    AccessibilityNodeInfo gp = p.getParent(); p.recycle(); p = gp;
+                    if (p.isClickable()) {
+                        p.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                        root.recycle();
+                        return;
+                    }
+                    AccessibilityNodeInfo gp = p.getParent();
+                    p.recycle();
+                    p = gp;
                 }
             }
         }
         root.recycle();
     }
 
-    // Step 5: Read phone from "Call customer" sheet
+    /**
+     * Step 5: Read phone from "Call customer" sheet
+     * Sheet shows: "Call customer" title + name + phone (+17147142820)
+     */
     private void tryReadCallSheet(AccessibilityNodeInfo root) {
         List<AccessibilityNodeInfo> titles = root.findAccessibilityNodeInfosByText("Call customer");
         if (titles == null || titles.isEmpty()) return;
+
         String phone = findPhoneNumber(root);
         if (phone != null && !phone.isEmpty()) {
             currentPhoneNumber = phone;
@@ -135,13 +167,13 @@ public class WoltAccessibilityService extends AccessibilityService {
         new Thread(() -> {
             boolean ok = GoogleSheetsManager.getInstance(getApplicationContext()).appendRow(o, n, p);
             handler.post(() -> {
-                if (ok) NotificationHelper.showSuccess(getApplicationContext(), o + " — " + n + " saved ✅");
+                if (ok) NotificationHelper.showSuccess(getApplicationContext(), o + " — " + n + " saved");
                 else NotificationHelper.showError(getApplicationContext(), "Failed: " + o);
             });
         }).start();
     }
 
-    // Find order number — format "#001"
+    // Find order number pattern #001, #002 etc
     private String findOrderNumber(AccessibilityNodeInfo root) {
         return traverseFind(root, node -> {
             CharSequence t = node.getText();
@@ -149,7 +181,6 @@ public class WoltAccessibilityService extends AccessibilityService {
         });
     }
 
-    // Find text starting with prefix
     private String findTextStartingWith(AccessibilityNodeInfo root, String prefix) {
         return traverseFind(root, node -> {
             CharSequence t = node.getText();
@@ -157,7 +188,6 @@ public class WoltAccessibilityService extends AccessibilityService {
         });
     }
 
-    // Find customer name in same row as Call button
     private String findCustomerNameNearCallButton(AccessibilityNodeInfo root) {
         return traverseFind(root, node -> {
             CharSequence t = node.getText();
@@ -186,20 +216,28 @@ public class WoltAccessibilityService extends AccessibilityService {
         CharSequence t = node.getText();
         if (t != null) {
             String s = t.toString().trim();
-            if (!s.isEmpty() && !s.equals("Call") && !s.equals("Call customer") && !s.startsWith("+") && !s.startsWith("#") && s.length() > 1 && s.length() < 60 && Character.isLetter(s.charAt(0)))
+            if (!s.isEmpty() && !s.equals("Call") && !s.equals("Call customer")
+                    && !s.startsWith("+") && !s.startsWith("#")
+                    && s.length() > 1 && s.length() < 60
+                    && Character.isLetter(s.charAt(0)))
                 return s;
         }
-        for (int i = 0; i < node.getChildCount(); i++) { AccessibilityNodeInfo c = node.getChild(i); String r = findNameInSubtree(c); if (r != null) return r; if (c != null) c.recycle(); }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo c = node.getChild(i);
+            String r = findNameInSubtree(c);
+            if (r != null) return r;
+            if (c != null) c.recycle();
+        }
         return null;
     }
 
-    // Find phone number — +XXXXXXXXXXX format
     private String findPhoneNumber(AccessibilityNodeInfo root) {
         return traverseFind(root, node -> {
             CharSequence t = node.getText();
             if (t != null) {
                 String s = t.toString().trim();
-                if (s.matches("\\+?[\\d]{7,15}") || s.matches("\\+[\\d\\s\\-]{8,20}")) return s.replaceAll("[\\s\\-]", "");
+                if (s.matches("\\+?[\\d]{7,15}") || s.matches("\\+[\\d\\s\\-]{8,20}"))
+                    return s.replaceAll("[\\s\\-]", "");
             }
             return null;
         });
@@ -209,7 +247,12 @@ public class WoltAccessibilityService extends AccessibilityService {
         if (root == null) return null;
         CharSequence t = root.getText();
         if (t != null && t.toString().contains(text) && root.isClickable()) return root;
-        for (int i = 0; i < root.getChildCount(); i++) { AccessibilityNodeInfo c = root.getChild(i); AccessibilityNodeInfo r = findClickableContaining(c, text); if (r != null) return r; if (c != null) c.recycle(); }
+        for (int i = 0; i < root.getChildCount(); i++) {
+            AccessibilityNodeInfo c = root.getChild(i);
+            AccessibilityNodeInfo r = findClickableContaining(c, text);
+            if (r != null) return r;
+            if (c != null) c.recycle();
+        }
         return null;
     }
 
@@ -217,7 +260,12 @@ public class WoltAccessibilityService extends AccessibilityService {
         if (root == null) return null;
         CharSequence cd = root.getContentDescription();
         if (cd != null && cd.toString().equalsIgnoreCase(desc) && root.isClickable()) return root;
-        for (int i = 0; i < root.getChildCount(); i++) { AccessibilityNodeInfo c = root.getChild(i); AccessibilityNodeInfo r = findNodeByContentDescription(c, desc); if (r != null) return r; if (c != null) c.recycle(); }
+        for (int i = 0; i < root.getChildCount(); i++) {
+            AccessibilityNodeInfo c = root.getChild(i);
+            AccessibilityNodeInfo r = findNodeByContentDescription(c, desc);
+            if (r != null) return r;
+            if (c != null) c.recycle();
+        }
         return null;
     }
 
@@ -227,7 +275,12 @@ public class WoltAccessibilityService extends AccessibilityService {
         if (node == null) return null;
         String r = matcher.match(node);
         if (r != null) return r;
-        for (int i = 0; i < node.getChildCount(); i++) { AccessibilityNodeInfo c = node.getChild(i); String res = traverseFind(c, matcher); if (res != null) return res; if (c != null) c.recycle(); }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo c = node.getChild(i);
+            String res = traverseFind(c, matcher);
+            if (res != null) return res;
+            if (c != null) c.recycle();
+        }
         return null;
     }
 
